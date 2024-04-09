@@ -6,6 +6,7 @@ defmodule LgbmExx do
   alias LgbmExx.Splitter
   alias LgbmExx.CVModel
   alias LgbmExx.CVResult
+  alias Explorer.DataFrame, as: DF
 
   @doc """
   Returns evaluation values each k-folding model.
@@ -83,5 +84,56 @@ defmodule LgbmExx do
     for sub <- combinations(rest), value <- values do
       [{name, value} | sub]
     end
+  end
+
+  @doc """
+  One-hot encoding
+
+  ## Args
+
+  df: DataFrame
+  columns: target columns. The columns are not incluced in the returns.
+  threshold: Only elements exceeding this number will be considered.
+  """
+  def one_hot_encode(df, columns, threshold \\ 3)
+
+  def one_hot_encode(df, [], _threshold), do: df
+
+  def one_hot_encode(df, nil, _threshold), do: df
+
+  def one_hot_encode(df, columns, threshold) do
+    # HACKME
+    nil_names = Enum.map(columns, & &1 <> "_")
+    dummies = DF.dummies(df, columns)
+    one_hot_names = DF.names(dummies)
+    one_hot_names_without_nil = one_hot_names -- nil_names
+
+    columns_stats(dummies, one_hot_names_without_nil)
+    |> Enum.filter(fn {_name, %{"count" => count}} -> (count > threshold) end)
+    |> Enum.map(& elem(&1, 0))
+    |> case do
+      [] ->
+        DF.discard(df, columns)
+
+      valid_one_hot_names ->
+        dummies = DF.select(dummies, valid_one_hot_names)
+
+        df
+        |> DF.concat_columns(dummies)
+        |> DF.discard(columns)
+    end
+  end
+
+  @doc """
+  Returns columns stats as map.
+  """
+  def columns_stats(df, columns) do
+    stats_map = DF.describe(df[columns]) |> DF.to_columns()
+
+    Map.delete(stats_map, "describe")
+    |> Enum.reduce(%{}, fn {column, values}, acc ->
+      stats = Enum.zip(stats_map["describe"], values) |> Map.new()
+      Map.put(acc, column, stats)
+    end)
   end
 end

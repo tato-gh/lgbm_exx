@@ -1,7 +1,7 @@
 defmodule LgbmExxTest do
   use ExUnit.Case, async: false
 
-  setup(%{tmp_dir: tmp_dir}) do
+  defp setup_model(%{tmp_dir: tmp_dir}) do
     Application.put_env(:lgbm_ex, :workdir, tmp_dir)
 
     {_, df} = Explorer.Datasets.iris() |> LgbmEx.preproccessing_label_encode("species")
@@ -19,6 +19,8 @@ defmodule LgbmExxTest do
 
   describe "cross_validate" do
     @describetag :tmp_dir
+
+    setup [:setup_model]
 
     test "basic uses returns results", %{model: model} do
       {100, 50, [result | _]} = LgbmExx.cross_validate(model, 3)
@@ -78,6 +80,8 @@ defmodule LgbmExxTest do
   describe "aggregate_cv_results" do
     @describetag :tmp_dir
 
+    setup [:setup_model]
+
     test "returns aggregation result", %{model: model} do
       {100, 50, cv_results} = LgbmExx.cross_validate(model, 3)
 
@@ -95,6 +99,8 @@ defmodule LgbmExxTest do
   describe "grid_search" do
     @describetag :tmp_dir
 
+    setup [:setup_model]
+
     test "returns result each parameter combination", %{model: model} do
       grid = [
         num_iterations: [5, 10],
@@ -106,6 +112,32 @@ defmodule LgbmExxTest do
       assert 6 == Enum.count(results)
       assert [num_iterations: 5, min_data_in_leaf: 2] == parameters
       assert result.num_iterations == 5
+    end
+  end
+
+  describe "one_hot_encode" do
+    @describetag :tmp_dir
+
+    test "returns df with one_hot_encoded columns" do
+      df = Explorer.Datasets.iris()
+      df_done = LgbmExx.one_hot_encode(df, ["species"])
+
+      assert_raise ArgumentError, fn -> df_done["species"] end
+      assert df_done["species_Iris-setosa"]
+      assert df_done["species_Iris-versicolor"]
+      assert df_done["species_Iris-virginica"]
+    end
+  end
+
+  describe "columns_stats" do
+    @describetag :tmp_dir
+
+    test "returns statistics map" do
+      df = Explorer.Datasets.iris()
+      stats = LgbmExx.columns_stats(df, ["sepal_length", "sepal_width"])
+
+      assert stats["sepal_length"]["count"] == 150
+      assert stats["sepal_width"]["count"] == 150
     end
   end
 end
