@@ -21,16 +21,19 @@ defmodule LgbmExx do
 
   #### options
 
-  `folding_rule` is one of `[:raw, :shuffle, :sort, :sort_with_shuffle]`. Default is `:shuffle`.
+  `folding_rule` is one of `[:raw, :shuffle, :sort, :sort_with_shuffle]`
 
-  - raw: folds data as is
+  - raw: folds data as is row number order (default)
   - shuffle: folds after shuffling data
   - sort: folds after sort to obtain unbiased data in each group
   - sort_with_shuffle: same as `sort`, however shuffle first.
 
+  `x_test` are test data. If `x_test` are specified, these predicted results of each cv-model are being included in results.
+
+  `evaluator` is function to calculate evaluation value between val_data and those predicted value.
   """
   def cross_validate(model, k, options \\ []) do
-    folding_rule = Keyword.get(options, :folding_rule, :shuffle)
+    folding_rule = Keyword.get(options, :folding_rule, :raw)
     x_test = Keyword.get(options, :x_test, [])
     evaluator = Keyword.get(options, :evaluator, nil)
 

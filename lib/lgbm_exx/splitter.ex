@@ -11,7 +11,7 @@ defmodule LgbmExx.Splitter do
     {:ok, val_df} = read_validation_csv(model.files.train, model.files.validation)
     full_nx = concat_rows(train_df, val_df) |> Nx.stack(axis: -1)
 
-    [{train_one, val_one} | _] = list = split(full_nx, k, folding_rule)
+    [{train_one, val_one} | _] = list = split(full_nx, k, folding_rule, model.num_classes)
     names = list_names(model)
 
     list_df =
@@ -22,21 +22,27 @@ defmodule LgbmExx.Splitter do
     {Nx.axis_size(train_one, 0), Nx.axis_size(val_one, 0), list_df}
   end
 
-  defp split(full_nx, k, :raw) do
+  defp split(full_nx, k, :raw, _) do
     _split(full_nx, k)
   end
 
-  defp split(full_nx, k, :shuffle) do
+  defp split(full_nx, k, :shuffle, _) do
     shuffle(full_nx) |> _split(k)
   end
 
-  defp split(full_nx, k, :sort) do
+  defp split(full_nx, k, :sort, num_classes) do
     # 1. sort by prediction target value
     #   prediction target value is index: 0
     indexes = list_sorted_indexes(full_nx)
 
     # 2. divide data to k groups in order
-    indexes_groups = chunk_group(indexes, k)
+    #   In class classification,
+    #   it should be at least greater than the number of classes.
+    #   This will reduce the bias of the data when k-folding.
+    #   temporary: num_classes * 3
+    num_groups = if(num_classes, do: num_classes * 3, else: k)
+    num_groups = Enum.max([k, num_classes])
+    indexes_groups = chunk_group(indexes, num_groups)
 
     # 3. concat k_fold_splitted data of each groups
     k_fold_split_on_groups(indexes_groups, k)
@@ -47,13 +53,14 @@ defmodule LgbmExx.Splitter do
     end)
   end
 
-  defp split(full_nx, k, :sort_with_shuffle) do
+  defp split(full_nx, k, :sort_with_shuffle, num_classes) do
     # 1. sort by prediction target value
     #   prediction target value is index: 0
     indexes = list_sorted_indexes(full_nx)
 
     # 2. divide data to k groups in order with shuffle data in group
-    indexes_groups = chunk_group(indexes, k, shuffle: true)
+    num_groups = Enum.max([k, num_classes])
+    indexes_groups = chunk_group(indexes, num_groups, shuffle: true)
 
     # 3. concat k_fold_splitted data of each groups
     k_fold_split_on_groups(indexes_groups, k)
@@ -74,7 +81,7 @@ defmodule LgbmExx.Splitter do
     |> DataFrame.new()
     |> DataFrame.rename(["value"])
     |> DataFrame.mutate(index: Series.row_index(value))
-    |> DataFrame.sort_by(value)
+    |> DataFrame.sort_by(asc: value)
     |> DataFrame.pull("index")
   end
 
@@ -92,23 +99,20 @@ defmodule LgbmExx.Splitter do
 
   defp k_fold_split_on_groups(groups, k) do
     groups
-    |> Enum.reduce([], fn group, acc ->
-      Series.to_tensor(group)
-      |> Scholar.ModelSelection.k_fold_split(k)
-      |> Enum.to_list()
-      |> Enum.with_index(0)
-      |> Enum.reduce(acc, fn {{train_nx, val_nx}, i_k}, acc_i ->
-        Enum.at(acc_i, i_k)
-        |> if do
-          List.update_at(acc_i, i_k, fn {train_acc, val_acc} ->
-            {
-              Nx.concatenate([train_acc, train_nx], axis: 0),
-              Nx.concatenate([val_acc, val_nx], axis: 0)
-            }
-          end)
-        else
-          List.insert_at(acc_i, i_k, {train_nx, val_nx})
-        end
+    |> Enum.map(& Series.to_tensor(&1) |> Scholar.ModelSelection.k_fold_split(k))
+    |> Enum.zip_reduce([], & &2 ++ [&1])
+    |> Enum.map(fn group_parts ->
+      # concat each group train/val tensor
+      group_parts
+      |> Enum.reduce({nil, nil}, fn
+        {train_nx, val_nx}, {nil, nil} ->
+          {train_nx, val_nx}
+
+        {train_nx, val_nx}, {acc_train_nx, acc_val_nx} ->
+          {
+            Nx.concatenate([acc_train_nx, train_nx], axis: 0),
+            Nx.concatenate([acc_val_nx, val_nx], axis: 0)
+          }
       end)
     end)
   end
