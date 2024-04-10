@@ -140,4 +140,33 @@ defmodule LgbmExxTest do
       assert stats["sepal_width"]["count"] == 150
     end
   end
+
+  describe "get_correlation_map" do
+    @describetag :tmp_dir
+
+    test "returns statistics map" do
+      df = Explorer.Datasets.iris()
+      correlation_result = Explorer.DataFrame.correlation(df)
+      sepal_length = LgbmExx.get_correlation_map(correlation_result, "sepal_length")
+
+      assert %{
+        "petal_length" => 0.8717541573048646,
+        "petal_width" => 0.8179536333691573,
+        "sepal_length" => 1.0,
+        "sepal_width" => -0.10936924995064126
+      } = sepal_length
+    end
+  end
+
+  describe "map_importance_rate" do
+    @describetag :tmp_dir
+
+    setup [:setup_model]
+
+    test "returns rates", %{model: model} do
+      x_names = Keyword.get(model.parameters, :x_names)
+      [most_importance | _] = LgbmExx.map_importance_rate(x_names, model.feature_importance_gain)
+      assert {"petal_length", 0.6582736372947693} = most_importance
+    end
+  end
 end

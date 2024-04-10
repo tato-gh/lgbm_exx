@@ -136,4 +136,36 @@ defmodule LgbmExx do
       Map.put(acc, column, stats)
     end)
   end
+
+  @doc """
+  Get given column map from DataFrame.correlation results.
+
+  ## Args
+
+  df: DataFrame.correlation result.
+  column: target column name.
+  """
+  def get_correlation_map(df, column) do
+    all = DF.to_columns(df)
+    column_index = Enum.find_index(all["names"], & &1 == column)
+
+    Enum.reduce(all["names"], %{}, fn name, acc ->
+      value = Enum.at(all[name], column_index)
+      Map.put(acc, name, value)
+    end)
+  end
+
+  @doc """
+  Convert feature_importance to rate
+  """
+  def map_importance_rate(names, feature_importance) do
+    l1 =
+      feature_importance
+      |> Nx.tensor()
+      |> Scholar.Preprocessing.normalize(norm: :manhattan)
+      |> Nx.to_list()
+
+    Enum.zip(names, l1)
+    |> Enum.sort_by(&elem(&1, 1), :desc)
+  end
 end
