@@ -15,25 +15,27 @@ defmodule LgbmExx.CVResult do
     cv_results
     |> Enum.filter(& &1)
     |> Enum.map(fn result ->
-      Enum.map(@aggregation_targets, & Map.get(result, &1))
+      Enum.map(@aggregation_targets, &Map.get(result, &1))
     end)
-    |> Enum.zip_reduce([], & &2 ++ [&1])
+    |> Enum.zip_reduce([], &(&2 ++ [&1]))
     |> Enum.zip(@aggregation_targets)
-    |> Enum.map(& get_stats/1)
+    |> Enum.map(&get_stats/1)
     |> Enum.filter(& &1)
     |> Map.new()
   end
 
-  defp get_stats({values, key}) when key in [:num_iterations, :last_evaluation, :evaluator_result] do
+  defp get_stats({values, key})
+       when key in [:num_iterations, :last_evaluation, :evaluator_result] do
     {key, calc_mean(Enum.filter(values, & &1))}
   end
 
-  defp get_stats({values, key}) when key in [:feature_importance_split, :feature_importance_gain] do
+  defp get_stats({values, key})
+       when key in [:feature_importance_split, :feature_importance_gain] do
     # k回分を統合してそれぞれ返す
     result =
       values
-      |> Enum.zip_reduce([], & &2 ++ [&1])
-      |> Enum.map(& calc_mean/1)
+      |> Enum.zip_reduce([], &(&2 ++ [&1]))
+      |> Enum.map(&calc_mean/1)
 
     {key, result}
   end
@@ -41,10 +43,10 @@ defmodule LgbmExx.CVResult do
   defp get_stats({values, :prediction}) do
     prediction =
       values
-      |> Enum.zip_reduce([], & &2 ++ [&1])
+      |> Enum.zip_reduce([], &(&2 ++ [&1]))
       |> Enum.map(fn row_probs_list ->
-        Enum.zip_reduce(row_probs_list, [], & &2 ++ [&1])
-        |> Enum.map(& calc_mean/1)
+        Enum.zip_reduce(row_probs_list, [], &(&2 ++ [&1]))
+        |> Enum.map(&calc_mean/1)
       end)
 
     {:prediction, prediction}

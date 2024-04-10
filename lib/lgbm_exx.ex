@@ -103,14 +103,14 @@ defmodule LgbmExx do
 
   def one_hot_encode(df, columns, threshold) do
     # HACKME
-    nil_names = Enum.map(columns, & &1 <> "_")
+    nil_names = Enum.map(columns, &(&1 <> "_"))
     dummies = DF.dummies(df, columns)
     one_hot_names = DF.names(dummies)
     one_hot_names_without_nil = one_hot_names -- nil_names
 
     columns_stats(dummies, one_hot_names_without_nil)
-    |> Enum.filter(fn {_name, %{"count" => count}} -> (count > threshold) end)
-    |> Enum.map(& elem(&1, 0))
+    |> Enum.filter(fn {_name, %{"count" => count}} -> count > threshold end)
+    |> Enum.map(&elem(&1, 0))
     |> case do
       [] ->
         DF.discard(df, columns)
@@ -147,7 +147,7 @@ defmodule LgbmExx do
   """
   def get_correlation_map(df, column) do
     all = DF.to_columns(df)
-    column_index = Enum.find_index(all["names"], & &1 == column)
+    column_index = Enum.find_index(all["names"], &(&1 == column))
 
     Enum.reduce(all["names"], %{}, fn name, acc ->
       value = Enum.at(all[name], column_index)

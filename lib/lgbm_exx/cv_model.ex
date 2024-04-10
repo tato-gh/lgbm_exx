@@ -29,7 +29,8 @@ defmodule LgbmExx.CVModel do
           feature_importance_gain: model_cv.feature_importance_gain
         }
 
-      _ -> nil
+      _ ->
+        nil
     end
   end
 end

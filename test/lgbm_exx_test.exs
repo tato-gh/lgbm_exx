@@ -150,11 +150,11 @@ defmodule LgbmExxTest do
       sepal_length = LgbmExx.get_correlation_map(correlation_result, "sepal_length")
 
       assert %{
-        "petal_length" => 0.8717541573048646,
-        "petal_width" => 0.8179536333691573,
-        "sepal_length" => 1.0,
-        "sepal_width" => -0.10936924995064126
-      } = sepal_length
+               "petal_length" => 0.8717541573048646,
+               "petal_width" => 0.8179536333691573,
+               "sepal_length" => 1.0,
+               "sepal_width" => -0.10936924995064126
+             } = sepal_length
     end
   end
 
