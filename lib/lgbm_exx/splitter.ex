@@ -41,7 +41,7 @@ defmodule LgbmExx.Splitter do
     #   This will reduce the bias of the data when k-folding.
     #   temporary: num_classes * 3
     num_groups = if(num_classes, do: num_classes * 3, else: k)
-    num_groups = Enum.max([k, num_classes])
+    num_groups = Enum.max([k, num_groups])
     indexes_groups = chunk_group(indexes, num_groups)
 
     # 3. concat k_fold_splitted data of each groups
