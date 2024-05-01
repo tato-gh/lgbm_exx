@@ -38,7 +38,9 @@ defmodule LgbmExxTest do
         [7.6, 3.0, 6.6, 2.2]
       ]
 
-      {_, _, [result | _]} = LgbmExx.cross_validate(model, 3, x_test: x_test, folding_rule: :sort)
+      {_, _, [result | _]} =
+        LgbmExx.cross_validate(model, 3, x_test: x_test, folding_rule: :stratified)
+
       [[p1, _, _], [_, p2, _], [_, _, p3]] = result.prediction
 
       assert p1 > 0.5
@@ -48,7 +50,7 @@ defmodule LgbmExxTest do
 
     test "uses with folding_rule", %{model: model} do
       result =
-        [:raw, :shuffle, :sort, :sort_with_shuffle]
+        [:raw, :shuffle, :stratified, :stratified_shuffle]
         |> Map.new(fn rule ->
           {_, _, [result | _]} = LgbmExx.cross_validate(model, 3, folding_rule: rule)
           {rule, result}
@@ -56,8 +58,8 @@ defmodule LgbmExxTest do
 
       assert result.raw.last_evaluation >= 1.0
       assert result.shuffle.last_evaluation < 0.3
-      assert result.sort.last_evaluation < 0.3
-      assert result.sort_with_shuffle.last_evaluation < 0.3
+      assert result.stratified.last_evaluation < 0.3
+      assert result.stratified_shuffle.last_evaluation < 0.3
     end
 
     test "uses with evaluator", %{model: model} do

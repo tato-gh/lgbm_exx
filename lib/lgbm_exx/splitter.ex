@@ -8,10 +8,9 @@ defmodule LgbmExx.Splitter do
 
   def split_train_data(model, k, folding_rule) do
     {:ok, train_df} = read_csv(model.files.train)
-    {:ok, val_df} = read_validation_csv(model.files.train, model.files.validation)
-    full_nx = concat_rows(train_df, val_df) |> Nx.stack(axis: -1)
+    nx = Nx.stack(train_df, axis: -1)
 
-    [{train_one, val_one} | _] = list = split(full_nx, k, folding_rule, model.num_classes)
+    [{train_one, val_one} | _] = list = split(nx, k, folding_rule, model.num_classes)
     names = list_names(model)
 
     list_df =
@@ -22,18 +21,18 @@ defmodule LgbmExx.Splitter do
     {Nx.axis_size(train_one, 0), Nx.axis_size(val_one, 0), list_df}
   end
 
-  defp split(full_nx, k, :raw, _) do
-    _split(full_nx, k)
+  defp split(nx, k, :raw, _) do
+    _split(nx, k)
   end
 
-  defp split(full_nx, k, :shuffle, _) do
-    shuffle(full_nx) |> _split(k)
+  defp split(nx, k, :shuffle, _) do
+    shuffle(nx) |> _split(k)
   end
 
-  defp split(full_nx, k, :sort, num_classes) do
+  defp split(nx, k, :stratified, num_classes) do
     # 1. sort by prediction target value
     #   prediction target value is index: 0
-    indexes = list_sorted_indexes(full_nx)
+    indexes = list_sorted_indexes(nx)
 
     # 2. divide data to k groups in order
     #   In class classification,
@@ -47,16 +46,16 @@ defmodule LgbmExx.Splitter do
     # 3. concat k_fold_splitted data of each groups
     k_fold_split_on_groups(indexes_groups, k)
     |> Enum.map(fn {train_index_nx, val_index_nx} ->
-      train_nx = Nx.take(full_nx, train_index_nx)
-      val_nx = Nx.take(full_nx, val_index_nx)
+      train_nx = Nx.take(nx, train_index_nx)
+      val_nx = Nx.take(nx, val_index_nx)
       {train_nx, val_nx}
     end)
   end
 
-  defp split(full_nx, k, :sort_with_shuffle, num_classes) do
+  defp split(nx, k, :stratified_shuffle, num_classes) do
     # 1. sort by prediction target value
     #   prediction target value is index: 0
-    indexes = list_sorted_indexes(full_nx)
+    indexes = list_sorted_indexes(nx)
 
     # 2. divide data to k groups in order with shuffle data in group
     num_groups = Enum.max([k, num_classes])
@@ -65,14 +64,14 @@ defmodule LgbmExx.Splitter do
     # 3. concat k_fold_splitted data of each groups
     k_fold_split_on_groups(indexes_groups, k)
     |> Enum.map(fn {train_index_nx, val_index_nx} ->
-      train_nx = Nx.take(full_nx, train_index_nx)
-      val_nx = Nx.take(full_nx, val_index_nx)
+      train_nx = Nx.take(nx, train_index_nx)
+      val_nx = Nx.take(nx, val_index_nx)
       {train_nx, val_nx}
     end)
   end
 
-  defp _split(full_nx, k) do
-    Scholar.ModelSelection.k_fold_split(full_nx, k)
+  defp _split(nx, k) do
+    Scholar.ModelSelection.k_fold_split(nx, k)
     |> Enum.to_list()
   end
 
@@ -99,8 +98,8 @@ defmodule LgbmExx.Splitter do
 
   defp k_fold_split_on_groups(groups, k) do
     groups
-    |> Enum.map(& Series.to_tensor(&1) |> Scholar.ModelSelection.k_fold_split(k))
-    |> Enum.zip_reduce([], & &2 ++ [&1])
+    |> Enum.map(&(Series.to_tensor(&1) |> Scholar.ModelSelection.k_fold_split(k)))
+    |> Enum.zip_reduce([], &(&2 ++ [&1]))
     |> Enum.map(fn group_parts ->
       # concat each group train/val tensor
       group_parts
@@ -131,21 +130,6 @@ defmodule LgbmExx.Splitter do
   defp read_csv(path) do
     File.exists?(path)
     |> if(do: DataFrame.from_csv(path, header: false))
-  end
-
-  defp read_validation_csv(train_path, validation_path) do
-    # skip if validation_csv is the hard copy file (that means data is same)
-    read? =
-      File.exists?(validation_path) &&
-        File.stat!(train_path).inode != File.stat!(validation_path).inode
-
-    if(read?, do: DataFrame.from_csv(validation_path, header: false), else: {:ok, nil})
-  end
-
-  defp concat_rows(train_df, nil), do: train_df
-
-  defp concat_rows(train_df, val_df) do
-    DataFrame.concat_rows(train_df, val_df)
   end
 
   defp list_names(model) do

@@ -21,12 +21,12 @@ defmodule LgbmExx do
 
   #### options
 
-  `folding_rule` is one of `[:raw, :shuffle, :sort, :sort_with_shuffle]`
+  `folding_rule` is one of `[:raw, :shuffle, :stratified, :stratified_shuffle]`
 
   - raw: folds data as is row number order (default)
   - shuffle: folds after shuffling data
-  - sort: folds after sort to obtain unbiased data in each group
-  - sort_with_shuffle: same as `sort`, however shuffle first.
+  - stratified: folds after sort to obtain unbiased data in each group
+  - stratified_shuffle: same as `stratified`, however shuffle first.
 
   `x_test` are test data. If `x_test` are specified, these predicted results of each cv-model are being included in results.
 
