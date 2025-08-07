@@ -24,9 +24,26 @@ defmodule LgbmExx.CVResult do
     |> Map.new()
   end
 
+  defp get_stats({values, :evaluator_result}) do
+    # check values list or tuples list
+    elem = List.first(values)
+
+    cond do
+      is_tuple(elem) ->
+        values
+        |> Enum.map(& Tuple.to_list/1)
+        |> Enum.zip_reduce([], & &2 ++ [&1])
+        |> Enum.map(& calc_stats/1)
+        |> then(& {:evaluator_result, &1})
+
+      true ->
+        {:evaluator_result, calc_stats(Enum.filter(values, & &1))}
+    end
+  end
+
   defp get_stats({values, key})
-       when key in [:num_iterations, :last_evaluation, :evaluator_result] do
-    {key, calc_mean(Enum.filter(values, & &1))}
+       when key in [:num_iterations, :last_evaluation] do
+    {key, calc_stats(Enum.filter(values, & &1))}
   end
 
   defp get_stats({values, key})
@@ -57,9 +74,22 @@ defmodule LgbmExx.CVResult do
   defp calc_mean([]), do: nil
 
   defp calc_mean(values) do
-    size = Enum.count(values)
-    sum = Enum.sum(values)
+    values
+    |> Explorer.Series.from_list()
+    |> Explorer.Series.mean
+  end
 
-    sum / size
+  defp calc_stats([]), do: nil
+
+  defp calc_stats(values) do
+    s = values |> Explorer.Series.from_list()
+
+    %{
+      mean: Explorer.Series.mean(s),
+      med: Explorer.Series.median(s),
+      std: Explorer.Series.standard_deviation(s),
+      max: Explorer.Series.max(s),
+      min: Explorer.Series.min(s)
+    }
   end
 end
