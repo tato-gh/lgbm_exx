@@ -17,20 +17,20 @@ defmodule LgbmExx.CVModel do
         evaluator.(y_val, pred_val)
       end
 
-    List.last(model_cv.learning_steps)
-    |> case do
-      {iteration_index, metric_val} ->
-        %{
-          num_iterations: iteration_index + 1,
-          last_evaluation: metric_val,
-          evaluator_result: evaluator_result,
-          prediction: LgbmEx.predict(model_cv, x_test),
-          feature_importance_split: model_cv.feature_importance_split,
-          feature_importance_gain: model_cv.feature_importance_gain
-        }
-
-      _ ->
+    last_evaluation =
+      if model_cv.learning_steps != [] do
+        List.last(model_cv.learning_steps) |> elem(1)
+      else
         nil
-    end
+      end
+
+    %{
+      num_iterations: model_cv.num_iterations,
+      last_evaluation: last_evaluation,
+      evaluator_result: evaluator_result,
+      prediction: LgbmEx.predict(model_cv, x_test),
+      feature_importance_split: model_cv.feature_importance_split,
+      feature_importance_gain: model_cv.feature_importance_gain
+    }
   end
 end
