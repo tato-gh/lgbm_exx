@@ -19,7 +19,7 @@ defmodule LgbmExx.CVModel do
 
     last_evaluation =
       if model_cv.learning_steps != [] do
-        List.last(model_cv.learning_steps) |> elem(1)
+        List.last(model_cv.learning_steps) |> elem(0)
       else
         nil
       end

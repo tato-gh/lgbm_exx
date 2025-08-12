@@ -35,12 +35,7 @@ defmodule LgbmExx.Splitter do
     indexes = list_sorted_indexes(nx)
 
     # 2. divide data to k groups in order
-    #   In class classification,
-    #   it should be at least greater than the number of classes.
-    #   This will reduce the bias of the data when k-folding.
-    #   temporary: num_classes * 3
-    num_groups = if(num_classes, do: num_classes * 3, else: k)
-    num_groups = Enum.max([k, num_groups])
+    num_groups = if(num_classes, do: k * num_classes, else: k)
     indexes_groups = chunk_group(indexes, num_groups)
 
     # 3. concat k_fold_splitted data of each groups
@@ -58,7 +53,7 @@ defmodule LgbmExx.Splitter do
     indexes = list_sorted_indexes(nx)
 
     # 2. divide data to k groups in order with shuffle data in group
-    num_groups = Enum.max([k, num_classes])
+    num_groups = if(num_classes, do: k * num_classes, else: k)
     indexes_groups = chunk_group(indexes, num_groups, shuffle: true)
 
     # 3. concat k_fold_splitted data of each groups
