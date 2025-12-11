@@ -131,12 +131,14 @@ defmodule LgbmExx.CVResultTest do
 
       # Check prediction is aggregated (averaged)
       assert is_list(result.prediction)
-      assert Enum.count(result.prediction) == 2  # Two samples
+      # Two samples
+      assert Enum.count(result.prediction) == 2
 
       # Check each prediction is averaged
       Enum.each(result.prediction, fn pred ->
         assert is_list(pred)
-        assert Enum.count(pred) == 3  # Three classes
+        # Three classes
+        assert Enum.count(pred) == 3
       end)
     end
 
@@ -168,6 +170,7 @@ defmodule LgbmExx.CVResultTest do
 
       # Check that values are means (1.5, 2.5, 3.5, 4.5)
       expected_means = [1.5, 2.5, 3.5, 4.5]
+
       Enum.zip(result.feature_importance_split, expected_means)
       |> Enum.each(fn {actual, expected} ->
         assert_in_delta(actual, expected, 0.01)
@@ -510,7 +513,8 @@ defmodule LgbmExx.CVResultTest do
 
       # Check that predictions are averaged correctly
       assert is_list(result.prediction)
-      assert Enum.count(result.prediction) == 2  # Two test samples
+      # Two test samples
+      assert Enum.count(result.prediction) == 2
 
       # Check first sample: avg of [0.2, 0.3, 0.5] and [0.3, 0.4, 0.3]
       [first_pred | _] = result.prediction
@@ -519,6 +523,7 @@ defmodule LgbmExx.CVResultTest do
 
       # Verify averaging: [(0.2+0.3)/2, (0.3+0.4)/2, (0.5+0.3)/2] = [0.25, 0.35, 0.4]
       expected_first = [0.25, 0.35, 0.4]
+
       Enum.zip(first_pred, expected_first)
       |> Enum.each(fn {actual, expected} ->
         assert_in_delta(actual, expected, 0.01)

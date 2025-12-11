@@ -105,7 +105,9 @@ defmodule LgbmExx do
   def one_hot_encode(df, nil, _threshold), do: df
 
   def one_hot_encode(df, columns, threshold) do
-    # HACKME
+    # Explorer.DataFrame.dummies/2 generates a column with "{col_name}_" suffix
+    # for each original column containing nil values. We exclude these nil-representing
+    # columns from the statistics calculation to avoid counting nil values in the results.
     nil_names = Enum.map(columns, &(&1 <> "_"))
     dummies = DF.dummies(df, columns)
     one_hot_names = DF.names(dummies)
@@ -132,10 +134,12 @@ defmodule LgbmExx do
   """
   def columns_stats(df, columns) do
     stats_map = DF.describe(df[columns]) |> DF.to_columns()
+    describe_labels = stats_map["describe"]
 
-    Map.delete(stats_map, "describe")
+    stats_map
+    |> Map.delete("describe")
     |> Enum.reduce(%{}, fn {column, values}, acc ->
-      stats = Enum.zip(stats_map["describe"], values) |> Map.new()
+      stats = Enum.zip(describe_labels, values) |> Map.new()
       Map.put(acc, column, stats)
     end)
   end

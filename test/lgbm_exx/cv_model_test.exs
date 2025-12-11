@@ -68,7 +68,10 @@ defmodule LgbmExx.CVModelTest do
 
     setup [:setup_model]
 
-    test "fit_and_evaluate without evaluator and x_test returns result map", %{model: model, df: df} do
+    test "fit_and_evaluate without evaluator and x_test returns result map", %{
+      model: model,
+      df: df
+    } do
       {train_df, val_df} = create_train_val_split(df)
 
       result = LgbmExx.CVModel.fit_and_evaluate(model, {train_df, val_df}, [], nil)
@@ -163,7 +166,10 @@ defmodule LgbmExx.CVModelTest do
       assert Enum.count(result.feature_importance_gain) == 4
     end
 
-    test "fit_and_evaluate with both evaluator and x_test works correctly", %{model: model, df: df} do
+    test "fit_and_evaluate with both evaluator and x_test works correctly", %{
+      model: model,
+      df: df
+    } do
       {train_df, val_df} = create_train_val_split(df)
 
       x_test = [

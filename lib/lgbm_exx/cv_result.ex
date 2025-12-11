@@ -31,10 +31,10 @@ defmodule LgbmExx.CVResult do
     cond do
       is_tuple(elem) ->
         values
-        |> Enum.map(& Tuple.to_list/1)
-        |> Enum.zip_reduce([], & &2 ++ [&1])
-        |> Enum.map(& calc_stats/1)
-        |> then(& {:evaluator_result, &1})
+        |> Enum.map(&Tuple.to_list/1)
+        |> Enum.zip_reduce([], &(&2 ++ [&1]))
+        |> Enum.map(&calc_stats/1)
+        |> then(&{:evaluator_result, &1})
 
       true ->
         {:evaluator_result, calc_stats(Enum.filter(values, & &1))}
@@ -58,25 +58,38 @@ defmodule LgbmExx.CVResult do
   end
 
   defp get_stats({values, :prediction}) do
+    # Aggregate predictions from k-fold cross-validation:
+    # 1. Transpose k predictions (one per fold) to group by row
+    # 2. For each row, calculate mean prediction across folds
     prediction =
       values
-      |> Enum.zip_reduce([], &(&2 ++ [&1]))
-      |> Enum.map(fn row_probs_list ->
-        Enum.zip_reduce(row_probs_list, [], &(&2 ++ [&1]))
-        |> Enum.map(&calc_mean/1)
-      end)
+      |> transpose_predictions()
+      |> Enum.map(&average_row_predictions/1)
 
     {:prediction, prediction}
   end
 
   defp get_stats(_), do: nil
 
+  defp transpose_predictions(predictions) do
+    # Convert list of k predictions into rows grouped by index
+    predictions
+    |> Enum.zip_reduce([], &(&2 ++ [&1]))
+  end
+
+  defp average_row_predictions(row_probs_list) do
+    # For each row, average the prediction values across k folds
+    row_probs_list
+    |> Enum.zip_reduce([], &(&2 ++ [&1]))
+    |> Enum.map(&calc_mean/1)
+  end
+
   defp calc_mean([]), do: nil
 
   defp calc_mean(values) do
     values
     |> Explorer.Series.from_list()
-    |> Explorer.Series.mean
+    |> Explorer.Series.mean()
   end
 
   defp calc_stats([]), do: nil

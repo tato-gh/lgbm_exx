@@ -71,6 +71,8 @@ defmodule LgbmExx.Splitter do
   end
 
   defp list_sorted_indexes(df) do
+    # Extract the target variable (column at index 0) and return row indexes
+    # sorted by the target variable values. This enables stratified splitting.
     Nx.take(df, Nx.tensor([0]), axis: 1)
     |> DataFrame.new()
     |> DataFrame.rename(["value"])
@@ -150,7 +152,10 @@ defmodule LgbmExx.Splitter do
         if val_offset > 0 and val_offset + val_size < total_size do
           # 両端にtrainデータがある場合
           left_indices = Nx.iota({val_offset})
-          right_indices = Nx.iota({total_size - val_offset - val_size}) |> Nx.add(val_offset + val_size)
+
+          right_indices =
+            Nx.iota({total_size - val_offset - val_size}) |> Nx.add(val_offset + val_size)
+
           Nx.concatenate([left_indices, right_indices])
         else
           # 片端だけの場合

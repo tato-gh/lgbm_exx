@@ -54,7 +54,9 @@ defmodule LgbmExxTest do
       results =
         rules
         |> Map.new(fn rule ->
-          {train_size, val_size, cv_results} = LgbmExx.cross_validate(model, 3, folding_rule: rule)
+          {train_size, val_size, cv_results} =
+            LgbmExx.cross_validate(model, 3, folding_rule: rule)
+
           {rule, {train_size, val_size, cv_results}}
         end)
 
@@ -120,6 +122,7 @@ defmodule LgbmExxTest do
 
     test "with all options combined", %{model: model} do
       x_test = [[5.4, 3.9, 1.7, 0.4]]
+
       evaluator = fn y_val, pred_val ->
         Enum.zip(y_val, pred_val) |> Enum.count()
       end
@@ -187,7 +190,8 @@ defmodule LgbmExxTest do
       assert Enum.count(result.prediction) == 1
       [pred] = result.prediction
       assert is_list(pred)
-      assert Enum.count(pred) == 3  # 3 classes
+      # 3 classes
+      assert Enum.count(pred) == 3
     end
   end
 
@@ -373,14 +377,17 @@ defmodule LgbmExxTest do
 
       # 重要度の降順であることを確認
       importances = Enum.map(results, &elem(&1, 1))
-      is_sorted_desc = Enum.reduce_while(
-        importances,
-        true,
-        fn
-          value, true -> {:cont, value}
-          value, prev -> if prev >= value, do: {:cont, value}, else: {:halt, false}
-        end
-      )
+
+      is_sorted_desc =
+        Enum.reduce_while(
+          importances,
+          true,
+          fn
+            value, true -> {:cont, value}
+            value, prev -> if prev >= value, do: {:cont, value}, else: {:halt, false}
+          end
+        )
+
       assert is_sorted_desc
     end
 

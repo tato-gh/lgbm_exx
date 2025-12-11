@@ -138,6 +138,7 @@ defmodule LgbmExx.SplitterTest do
 
       # シャッフルなので各foldが存在することを確認
       assert Enum.count(list) == 3
+
       Enum.each(list, fn {train_df, val_df} ->
         assert Explorer.DataFrame.n_rows(train_df) > 0
         assert Explorer.DataFrame.n_rows(val_df) > 0
@@ -149,6 +150,7 @@ defmodule LgbmExx.SplitterTest do
 
       # 層別分割なので各foldが存在することを確認
       assert Enum.count(list) == 3
+
       Enum.each(list, fn {train_df, val_df} ->
         assert Explorer.DataFrame.n_rows(train_df) > 0
         assert Explorer.DataFrame.n_rows(val_df) > 0
@@ -175,6 +177,7 @@ defmodule LgbmExx.SplitterTest do
 
       # 層別シャッフル分割なので各foldが存在することを確認
       assert Enum.count(list) == 3
+
       Enum.each(list, fn {train_df, val_df} ->
         assert Explorer.DataFrame.n_rows(train_df) > 0
         assert Explorer.DataFrame.n_rows(val_df) > 0
@@ -207,7 +210,8 @@ defmodule LgbmExx.SplitterTest do
       {_train_size, _val_size, list} = LgbmExx.Splitter.split_train_data(model, 3, :raw)
 
       original_columns = Keyword.get(model.parameters, :x_names) |> Enum.count()
-      original_columns = original_columns + 1  # y_name
+      # y_name
+      original_columns = original_columns + 1
 
       Enum.each(list, fn {train_df, val_df} ->
         assert Explorer.DataFrame.n_columns(train_df) == original_columns
@@ -232,14 +236,17 @@ defmodule LgbmExx.SplitterTest do
       {_train_size, _val_size, list} = LgbmExx.Splitter.split_train_data(model, 3, :raw)
 
       # 各foldの検証データが合計で全データをカバーしていることを確認
-      total_val_rows = Enum.reduce(list, 0, fn {_train_df, val_df}, acc ->
-        acc + Explorer.DataFrame.n_rows(val_df)
-      end)
+      total_val_rows =
+        Enum.reduce(list, 0, fn {_train_df, val_df}, acc ->
+          acc + Explorer.DataFrame.n_rows(val_df)
+        end)
 
       assert total_val_rows == 150
     end
 
-    test "stratified split maintains approximate class balance in validation sets", %{model: model} do
+    test "stratified split maintains approximate class balance in validation sets", %{
+      model: model
+    } do
       {_train_size, _val_size, list} = LgbmExx.Splitter.split_train_data(model, 3, :stratified)
 
       # Irisデータセットは3クラス×50サンプル = 150サンプル
@@ -269,7 +276,8 @@ defmodule LgbmExx.SplitterTest do
           |> Enum.into(%{}, fn row -> {row["values"], row["counts"]} end)
 
         # 各クラスの数を確認
-        species_values = Explorer.DataFrame.pull(val_df, "species")
+        species_values =
+          Explorer.DataFrame.pull(val_df, "species")
           |> Explorer.Series.distinct()
           |> Explorer.Series.to_list()
 
@@ -312,18 +320,21 @@ defmodule LgbmExx.SplitterTest do
       val_0_list = Nx.to_list(val_0)
       # 最初のfold: 連続したインデックスであることを確認
       expected_0 = Enum.to_list(0..49)
+
       assert val_0_list == expected_0,
              "First fold validation should be sequential indices 0-49"
 
       {_train_1, val_1} = Enum.at(result, 1)
       val_1_list = Nx.to_list(val_1)
       expected_1 = Enum.to_list(50..99)
+
       assert val_1_list == expected_1,
              "Second fold validation should be sequential indices 50-99"
 
       {_train_2, val_2} = Enum.at(result, 2)
       val_2_list = Nx.to_list(val_2)
       expected_2 = Enum.to_list(100..149)
+
       assert val_2_list == expected_2,
              "Third fold validation should be sequential indices 100-149"
     end
@@ -349,9 +360,10 @@ defmodule LgbmExx.SplitterTest do
       {_train_size, _val_size, list} = LgbmExx.Splitter.split_train_data(model, 3, :stratified)
 
       # 全validation setのサイズを収集
-      val_sizes = Enum.map(list, fn {_train_df, val_df} ->
-        Explorer.DataFrame.n_rows(val_df)
-      end)
+      val_sizes =
+        Enum.map(list, fn {_train_df, val_df} ->
+          Explorer.DataFrame.n_rows(val_df)
+        end)
 
       # 全validationデータの合計が元データと同じ
       total_val = Enum.sum(val_sizes)

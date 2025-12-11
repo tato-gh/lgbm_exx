@@ -32,6 +32,7 @@ defmodule LgbmExx.MixProject do
       # Data
       {:explorer, "~> 0.8.1"},
       {:scholar, "~> 0.2.1"},
+      {:nx, "~> 0.10.0"},
       # Test
       {:mix_test_observer, "~> 0.1", only: [:dev, :test], runtime: false}
     ]
