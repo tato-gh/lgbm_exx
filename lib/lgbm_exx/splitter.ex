@@ -81,10 +81,17 @@ defmodule LgbmExx.Splitter do
 
   defp chunk_group(series, k, options \\ []) do
     shuffle = Keyword.get(options, :shuffle, false)
-    group_size = round(Series.count(series) / k)
+    total_count = Series.count(series)
+    base_size = div(total_count, k)
+    remainder = rem(total_count, k)
 
     Enum.map(1..k, fn no ->
-      offset = (no - 1) * group_size
+      # 余りを最初のremainder個のグループに1つずつ分配
+      extra = if no <= remainder, do: 1, else: 0
+      group_size = base_size + extra
+
+      # 前のグループまでのサイズを計算してoffsetを決定
+      offset = (no - 1) * base_size + min(no - 1, remainder)
 
       Series.slice(series, offset, group_size)
       |> maybe_shuffle_series(shuffle)
@@ -93,7 +100,7 @@ defmodule LgbmExx.Splitter do
 
   defp k_fold_split_on_groups(groups, k) do
     groups
-    |> Enum.map(&(Series.to_tensor(&1) |> Scholar.ModelSelection.k_fold_split(k)))
+    |> Enum.map(&(Series.to_tensor(&1) |> safe_k_fold_split(k)))
     |> Enum.zip_reduce([], &(&2 ++ [&1]))
     |> Enum.map(fn group_parts ->
       # concat each group train/val tensor
@@ -108,6 +115,55 @@ defmodule LgbmExx.Splitter do
             Nx.concatenate([acc_val_nx, val_nx], axis: 0)
           }
       end)
+    end)
+  end
+
+  @doc """
+  データロスがないk-fold分割（余りを均等に配分）
+
+  ## 例
+      iex> safe_k_fold_split(Nx.tensor([0,1,2,3,4,5,6,7,8,9]), 3)
+      [
+        {[4,5,6,7,8,9], [0,1,2,3]},
+        {[0,1,2,3,7,8,9], [4,5,6]},
+        {[0,1,2,3,4,5,6], [7,8,9]}
+      ]
+  """
+  def safe_k_fold_split(tensor, k) do
+    total_size = Nx.size(tensor)
+    base_size = div(total_size, k)
+    remainder = rem(total_size, k)
+
+    0..(k - 1)
+    |> Enum.map(fn fold_idx ->
+      # 余りを最初のremainder個のfoldに1つずつ分配
+      val_extra = if fold_idx < remainder, do: 1, else: 0
+      val_size = base_size + val_extra
+      val_offset = fold_idx * base_size + min(fold_idx, remainder)
+
+      # validation indices
+      val_indices = Nx.iota({val_size}) |> Nx.add(val_offset)
+
+      # train indices (validation以外の全て)
+      # 0からval_offsetの直前まで、とval_offset+val_sizeから最後までを連結
+      train_indices =
+        if val_offset > 0 and val_offset + val_size < total_size do
+          # 両端にtrainデータがある場合
+          left_indices = Nx.iota({val_offset})
+          right_indices = Nx.iota({total_size - val_offset - val_size}) |> Nx.add(val_offset + val_size)
+          Nx.concatenate([left_indices, right_indices])
+        else
+          # 片端だけの場合
+          if val_offset == 0 do
+            # validationが先頭: [val_offset+val_size .. total_size-1]
+            Nx.iota({total_size - val_size}) |> Nx.add(val_size)
+          else
+            # validationが末尾: [0 .. val_offset-1]
+            Nx.iota({val_offset})
+          end
+        end
+
+      {Nx.take(tensor, train_indices), Nx.take(tensor, val_indices)}
     end)
   end
 
