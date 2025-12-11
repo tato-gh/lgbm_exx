@@ -81,6 +81,86 @@ defmodule LgbmExx do
     end)
   end
 
+  @doc """
+  Explore feature combinations by adding exploration sets to base features.
+
+  Generates all combinations of exploration_sets and evaluates each combination
+  with base_features using cross-validation. Returns results organized by
+  exploration set combinations.
+
+  - uses "_cv" named model directory
+
+  ## Args
+
+  `model`: LightGBM model with training data
+  `base_features`: List of feature names always included [e.g., ["a", "b"]]
+  `exploration_sets`: List of feature sets to explore [e.g., [["c"], ["d"], ["c", "d"]]]
+  `k`: Number of folds for cross-validation
+  `options`: Same as cross_validate/3 options
+
+  ## Returns
+
+  ```
+  %{
+    "base_features" => ["a", "b"],
+    "exploration" => %{
+      [] => aggregated_result_0,
+      ["c"] => aggregated_result_1,
+      ["d"] => aggregated_result_2,
+      ["c", "d"] => aggregated_result_3
+    }
+  }
+  ```
+  """
+  def explore_features(model, base_features, exploration_sets, k, options \\ []) do
+    # Get original model parameters
+    y_name = Keyword.get(model.parameters, :y_name)
+    model_name = model.name
+
+    # Read original train and validate data
+    {:ok, train_df_raw} = DF.from_csv(model.files.train, header: false)
+    {:ok, val_df_raw} = DF.from_csv(model.files.validation, header: false)
+
+    # Get all column names from the model's original parameters
+    all_cols = [y_name] ++ Keyword.get(model.parameters, :x_names)
+
+    # Rename columns to match the model's expectations
+    train_df = DF.rename(train_df_raw, all_cols)
+    val_df = DF.rename(val_df_raw, all_cols)
+
+    exploration_results =
+      exploration_sets
+      |> Enum.reduce(%{}, fn exploration_set, acc ->
+        actual_features = base_features ++ exploration_set
+
+        # Select only the features we need (y_name + actual_features)
+        selected_cols = [y_name] ++ actual_features
+        train_df_subset = DF.select(train_df, selected_cols)
+        val_df_subset = DF.select(val_df, selected_cols)
+
+        # Create new model with reduced feature set
+        model_tmp =
+          LgbmEx.fit(
+            "#{model_name}_exploration",
+            {train_df_subset, val_df_subset},
+            y_name,
+            model.parameters
+          )
+
+        {_, _, cv_results} = cross_validate(model_tmp, k, options)
+        aggregated = aggregate_cv_results(cv_results)
+        x_names = Keyword.get(model_tmp.parameters, :x_names)
+        aggregated_with_names = Map.put(aggregated, :x_names, x_names)
+
+        Map.put(acc, exploration_set, aggregated_with_names)
+      end)
+
+    %{
+      "base_features" => base_features,
+      "exploration" => exploration_results
+    }
+  end
+
   defp combinations([]), do: [[]]
 
   defp combinations([{name, values} | rest]) do

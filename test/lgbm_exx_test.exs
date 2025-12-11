@@ -417,4 +417,36 @@ defmodule LgbmExxTest do
       end)
     end
   end
+
+  describe "explore_features" do
+    @describetag :tmp_dir
+
+    setup [:setup_model]
+
+    test "multiple features together achieve better accuracy than single features", %{
+      model: model
+    } do
+      base_features = ["sepal_length"]
+      exploration_sets = [[], ["petal_length"], ["petal_width"], ["petal_length", "petal_width"]]
+
+      result =
+        LgbmExx.explore_features(model, base_features, exploration_sets, 2,
+          folding_rule: :stratified
+        )
+
+      exploration_results = result["exploration"]
+
+      # base_features が正しく保存されているか
+      assert result["base_features"] == base_features
+
+      # 各パターンの評価値を取得
+      single_petal_length = exploration_results[["petal_length"]].last_evaluation.mean
+      single_petal_width = exploration_results[["petal_width"]].last_evaluation.mean
+      combined = exploration_results[["petal_length", "petal_width"]].last_evaluation.mean
+
+      # combined が両方の単体より良いことを確認
+      assert combined < single_petal_length and combined < single_petal_width,
+             "Combined features should achieve better accuracy than both single features"
+    end
+  end
 end
