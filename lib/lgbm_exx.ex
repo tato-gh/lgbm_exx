@@ -255,4 +255,65 @@ defmodule LgbmExx do
     Enum.zip(names, l1)
     |> Enum.sort_by(&elem(&1, 1), :desc)
   end
+
+  @doc """
+  Compute permutation importance for a trained model.
+
+  Permutation importance measures how much the model performance decreases
+  when a single feature's values are randomly shuffled.
+
+  ## Args
+
+  - `model`: LgbmEx.Model - trained model
+  - `x_test`: Explorer.DataFrame - test feature data with column names matching model.parameters[:x_names]
+  - `y_test`: Explorer.Series or List - true labels
+  - `metric_fn`: Function - evaluation function `fn(pred_y :: list, correct_y :: list) -> scalar`
+    - Higher is better metrics (e.g., accuracy): positive importance means important feature
+    - Lower is better metrics (e.g., MSE): negative importance means important feature
+
+  ## Options
+
+  - `n_repeats`: number of times to permute a feature (default: 20)
+
+  ## Returns
+
+  `{baseline_score, [{feature_name :: String, importance_value :: Number}, ...]}`
+
+  Returns tuple of baseline score and list of importances in original feature order.
+  """
+  def permutation_importance(model, x_test, y_test, metric_fn, opts \\ []) do
+    n_repeats = Keyword.get(opts, :n_repeats, 20)
+
+    y_test_list = normalize_to_list(y_test)
+    x_names = Keyword.get(model.parameters, :x_names)
+
+    baseline_pred = LgbmEx.predict(model, x_test)
+    baseline_score = metric_fn.(baseline_pred, y_test_list)
+
+    importances =
+      Enum.map(x_names, fn feature_name ->
+        shuffled_scores =
+          for _ <- 1..n_repeats do
+            shuffled_x_test = shuffle_column(x_test, feature_name)
+            shuffled_pred = LgbmEx.predict(model, shuffled_x_test)
+            metric_fn.(shuffled_pred, y_test_list)
+          end
+
+        avg_shuffled_score = Enum.sum(shuffled_scores) / n_repeats
+        importance = baseline_score - avg_shuffled_score
+
+        {feature_name, importance}
+      end)
+
+    {baseline_score, importances}
+  end
+
+  defp normalize_to_list(%Explorer.Series{} = series), do: Explorer.Series.to_list(series)
+  defp normalize_to_list(list) when is_list(list), do: list
+
+  defp shuffle_column(df, column_name) do
+    col = DF.pull(df, column_name)
+    shuffled_series = Explorer.Series.shuffle(col)
+    DF.put(df, column_name, shuffled_series)
+  end
 end

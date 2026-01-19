@@ -449,4 +449,126 @@ defmodule LgbmExxTest do
              "Combined features should achieve better accuracy than both single features"
     end
   end
+
+  describe "permutation_importance" do
+    @describetag :tmp_dir
+
+    setup [:setup_model]
+
+    test "returns baseline and importance for each feature", %{model: model} do
+      x_names = Keyword.get(model.parameters, :x_names)
+      {:ok, train_df} = Explorer.DataFrame.from_csv(model.files.train, header: false)
+      train_df = Explorer.DataFrame.rename(train_df, ["species"] ++ x_names)
+
+      x_test = train_df[x_names]
+      y_test = train_df["species"]
+
+      accuracy_fn = fn pred_y, correct_y ->
+        Enum.zip(pred_y, correct_y)
+        |> Enum.count(fn {probs, label} ->
+          predicted_class = Enum.with_index(probs) |> Enum.max_by(&elem(&1, 0)) |> elem(1)
+          predicted_class == round(label)
+        end)
+        |> then(&(&1 / Enum.count(correct_y)))
+      end
+
+      {baseline, importances} =
+        LgbmExx.permutation_importance(model, x_test, y_test, accuracy_fn, n_repeats: 5)
+
+      assert is_number(baseline)
+      assert baseline > 0.5
+
+      assert is_list(importances)
+      assert Enum.count(importances) == 4
+
+      Enum.each(importances, fn {name, importance} ->
+        assert is_binary(name)
+        assert is_number(importance)
+      end)
+
+      feature_names = Enum.map(importances, &elem(&1, 0))
+      assert feature_names == x_names
+    end
+
+    test "petal features are more important than sepal features for iris classification", %{
+      model: model
+    } do
+      x_names = Keyword.get(model.parameters, :x_names)
+      {:ok, train_df} = Explorer.DataFrame.from_csv(model.files.train, header: false)
+      train_df = Explorer.DataFrame.rename(train_df, ["species"] ++ x_names)
+
+      x_test = train_df[x_names]
+      y_test = train_df["species"]
+
+      accuracy_fn = fn pred_y, correct_y ->
+        Enum.zip(pred_y, correct_y)
+        |> Enum.count(fn {probs, label} ->
+          predicted_class = Enum.with_index(probs) |> Enum.max_by(&elem(&1, 0)) |> elem(1)
+          predicted_class == round(label)
+        end)
+        |> then(&(&1 / Enum.count(correct_y)))
+      end
+
+      {_baseline, importances} =
+        LgbmExx.permutation_importance(model, x_test, y_test, accuracy_fn, n_repeats: 10)
+
+      importance_map = Map.new(importances)
+
+      petal_length_imp = importance_map["petal_length"]
+      petal_width_imp = importance_map["petal_width"]
+      sepal_length_imp = importance_map["sepal_length"]
+      sepal_width_imp = importance_map["sepal_width"]
+
+      assert petal_length_imp > sepal_length_imp or petal_width_imp > sepal_width_imp,
+             "At least one petal feature should be more important than sepal features"
+    end
+
+    test "accepts y_test as list", %{model: model} do
+      x_names = Keyword.get(model.parameters, :x_names)
+      {:ok, train_df} = Explorer.DataFrame.from_csv(model.files.train, header: false)
+      train_df = Explorer.DataFrame.rename(train_df, ["species"] ++ x_names)
+
+      x_test = train_df[x_names]
+      y_test = train_df["species"] |> Explorer.Series.to_list()
+
+      accuracy_fn = fn pred_y, correct_y ->
+        Enum.zip(pred_y, correct_y)
+        |> Enum.count(fn {probs, label} ->
+          predicted_class = Enum.with_index(probs) |> Enum.max_by(&elem(&1, 0)) |> elem(1)
+          predicted_class == round(label)
+        end)
+        |> then(&(&1 / Enum.count(correct_y)))
+      end
+
+      {baseline, importances} =
+        LgbmExx.permutation_importance(model, x_test, y_test, accuracy_fn, n_repeats: 3)
+
+      assert is_number(baseline)
+      assert is_list(importances)
+      assert Enum.count(importances) == 4
+    end
+
+    test "uses default n_repeats of 20", %{model: model} do
+      x_names = Keyword.get(model.parameters, :x_names)
+      {:ok, train_df} = Explorer.DataFrame.from_csv(model.files.train, header: false)
+      train_df = Explorer.DataFrame.rename(train_df, ["species"] ++ x_names)
+
+      x_test = train_df[x_names]
+      y_test = train_df["species"]
+
+      call_count = :counters.new(1, [:atomics])
+
+      counting_metric_fn = fn pred_y, correct_y ->
+        :counters.add(call_count, 1, 1)
+        Enum.count(pred_y) + Enum.count(correct_y)
+      end
+
+      {_baseline, _importances} =
+        LgbmExx.permutation_importance(model, x_test, y_test, counting_metric_fn)
+
+      total_calls = :counters.get(call_count, 1)
+      # 1 baseline + 4 features * 20 repeats = 81 calls
+      assert total_calls == 81
+    end
+  end
 end
