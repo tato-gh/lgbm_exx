@@ -291,10 +291,12 @@ defmodule LgbmExx do
     baseline_score = metric_fn.(baseline_pred, y_test_list)
 
     importances =
-      Enum.map(x_names, fn feature_name ->
+      x_names
+      |> Enum.with_index()
+      |> Enum.map(fn {feature_name, col_idx} ->
         shuffled_scores =
           for _ <- 1..n_repeats do
-            shuffled_x_test = shuffle_column(x_test, feature_name)
+            shuffled_x_test = shuffle_column_at(x_test, col_idx)
             shuffled_pred = LgbmEx.predict(model, shuffled_x_test)
             metric_fn.(shuffled_pred, y_test_list)
           end
@@ -311,9 +313,12 @@ defmodule LgbmExx do
   defp normalize_to_list(%Explorer.Series{} = series), do: Explorer.Series.to_list(series)
   defp normalize_to_list(list) when is_list(list), do: list
 
-  defp shuffle_column(df, column_name) do
-    col = DF.pull(df, column_name)
-    shuffled_series = Explorer.Series.shuffle(col)
-    DF.put(df, column_name, shuffled_series)
+  defp shuffle_column_at(rows, col_idx) do
+    col_values = Enum.map(rows, &Enum.at(&1, col_idx))
+    shuffled_col = Enum.shuffle(col_values)
+
+    rows
+    |> Enum.zip(shuffled_col)
+    |> Enum.map(fn {row, new_val} -> List.replace_at(row, col_idx, new_val) end)
   end
 end

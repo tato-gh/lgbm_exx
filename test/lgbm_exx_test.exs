@@ -455,13 +455,17 @@ defmodule LgbmExxTest do
 
     setup [:setup_model]
 
+    defp df_to_list(df) do
+      Nx.stack(df, axis: -1) |> Nx.to_list()
+    end
+
     test "returns baseline and importance for each feature", %{model: model} do
       x_names = Keyword.get(model.parameters, :x_names)
       {:ok, train_df} = Explorer.DataFrame.from_csv(model.files.train, header: false)
       train_df = Explorer.DataFrame.rename(train_df, ["species"] ++ x_names)
 
-      x_test = train_df[x_names]
-      y_test = train_df["species"]
+      x_test = train_df[x_names] |> df_to_list()
+      y_test = train_df["species"] |> Explorer.Series.to_list()
 
       accuracy_fn = fn pred_y, correct_y ->
         Enum.zip(pred_y, correct_y)
@@ -497,8 +501,8 @@ defmodule LgbmExxTest do
       {:ok, train_df} = Explorer.DataFrame.from_csv(model.files.train, header: false)
       train_df = Explorer.DataFrame.rename(train_df, ["species"] ++ x_names)
 
-      x_test = train_df[x_names]
-      y_test = train_df["species"]
+      x_test = train_df[x_names] |> df_to_list()
+      y_test = train_df["species"] |> Explorer.Series.to_list()
 
       accuracy_fn = fn pred_y, correct_y ->
         Enum.zip(pred_y, correct_y)
@@ -528,7 +532,7 @@ defmodule LgbmExxTest do
       {:ok, train_df} = Explorer.DataFrame.from_csv(model.files.train, header: false)
       train_df = Explorer.DataFrame.rename(train_df, ["species"] ++ x_names)
 
-      x_test = train_df[x_names]
+      x_test = train_df[x_names] |> df_to_list()
       y_test = train_df["species"] |> Explorer.Series.to_list()
 
       accuracy_fn = fn pred_y, correct_y ->
@@ -553,8 +557,8 @@ defmodule LgbmExxTest do
       {:ok, train_df} = Explorer.DataFrame.from_csv(model.files.train, header: false)
       train_df = Explorer.DataFrame.rename(train_df, ["species"] ++ x_names)
 
-      x_test = train_df[x_names]
-      y_test = train_df["species"]
+      x_test = train_df[x_names] |> df_to_list()
+      y_test = train_df["species"] |> Explorer.Series.to_list()
 
       call_count = :counters.new(1, [:atomics])
 
