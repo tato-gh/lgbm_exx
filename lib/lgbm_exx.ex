@@ -273,7 +273,8 @@ defmodule LgbmExx do
 
   ## Options
 
-  - `n_repeats`: number of times to permute a feature (default: 20)
+  - `n_repeats`: number of times to permute a feature (default: 5)
+  - `features`: list of feature names to evaluate (default: all features from model)
 
   ## Returns
 
@@ -282,17 +283,21 @@ defmodule LgbmExx do
   Returns tuple of baseline score and list of importances in original feature order.
   """
   def permutation_importance(model, x_test, y_test, metric_fn, opts \\ []) do
-    n_repeats = Keyword.get(opts, :n_repeats, 20)
+    n_repeats = Keyword.get(opts, :n_repeats, 5)
 
     y_test_list = normalize_to_list(y_test)
     x_names = Keyword.get(model.parameters, :x_names)
+    target_features = Keyword.get(opts, :features) || x_names
 
     baseline_pred = LgbmEx.predict(model, x_test)
     baseline_score = metric_fn.(baseline_pred, y_test_list)
 
     importances =
-      x_names
-      |> Enum.with_index()
+      target_features
+      |> Enum.map(fn feature_name ->
+        col_idx = Enum.find_index(x_names, &(&1 == feature_name))
+        {feature_name, col_idx}
+      end)
       |> Enum.map(fn {feature_name, col_idx} ->
         shuffled_scores =
           for _ <- 1..n_repeats do

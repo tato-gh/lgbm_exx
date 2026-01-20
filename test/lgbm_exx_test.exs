@@ -552,7 +552,7 @@ defmodule LgbmExxTest do
       assert Enum.count(importances) == 4
     end
 
-    test "uses default n_repeats of 20", %{model: model} do
+    test "uses default n_repeats of 5", %{model: model} do
       x_names = Keyword.get(model.parameters, :x_names)
       {:ok, train_df} = Explorer.DataFrame.from_csv(model.files.train, header: false)
       train_df = Explorer.DataFrame.rename(train_df, ["species"] ++ x_names)
@@ -571,8 +571,38 @@ defmodule LgbmExxTest do
         LgbmExx.permutation_importance(model, x_test, y_test, counting_metric_fn)
 
       total_calls = :counters.get(call_count, 1)
-      # 1 baseline + 4 features * 20 repeats = 81 calls
-      assert total_calls == 81
+      # 1 baseline + 4 features * 5 repeats = 21 calls
+      assert total_calls == 21
+    end
+
+    test "evaluates only specified features when :features option is given", %{model: model} do
+      x_names = Keyword.get(model.parameters, :x_names)
+      {:ok, train_df} = Explorer.DataFrame.from_csv(model.files.train, header: false)
+      train_df = Explorer.DataFrame.rename(train_df, ["species"] ++ x_names)
+
+      x_test = train_df[x_names] |> df_to_list()
+      y_test = train_df["species"] |> Explorer.Series.to_list()
+
+      accuracy_fn = fn pred_y, correct_y ->
+        Enum.zip(pred_y, correct_y)
+        |> Enum.count(fn {probs, label} ->
+          predicted_class = Enum.with_index(probs) |> Enum.max_by(&elem(&1, 0)) |> elem(1)
+          predicted_class == round(label)
+        end)
+        |> then(&(&1 / Enum.count(correct_y)))
+      end
+
+      target_features = ["petal_length", "petal_width"]
+
+      {_baseline, importances} =
+        LgbmExx.permutation_importance(model, x_test, y_test, accuracy_fn,
+          features: target_features,
+          n_repeats: 3
+        )
+
+      assert Enum.count(importances) == 2
+      feature_names = Enum.map(importances, &elem(&1, 0))
+      assert feature_names == target_features
     end
   end
 end
